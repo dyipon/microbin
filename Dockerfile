@@ -1,36 +1,24 @@
-FROM rust:latest as build
 
-WORKDIR /app
+# latest rust will be used to build the binary
+FROM rust:latest as builder
 
+# the temporary directory where we build
+WORKDIR /usr/src/microbin
+
+# copy sources to /usr/src/microbin on the temporary container
 COPY . .
 
-RUN \
-  DEBIAN_FRONTEND=noninteractive \
-  apt-get update &&\
-  apt-get -y install ca-certificates tzdata &&\
-  cargo build --release
+# run release build
+RUN cargo build --release
 
-# https://hub.docker.com/r/bitnami/minideb
-FROM bitnami/minideb:latest
+# create final container using slim version of debian
+FROM debian:bullseye-slim
 
-# microbin will be in /app
-WORKDIR /app
-
-# copy time zone info
-COPY --from=build \
-  /usr/share/zoneinfo \
-  /usr/share/zoneinfo
-
-COPY --from=build \
-  /etc/ssl/certs/ca-certificates.crt \
-  /etc/ssl/certs/ca-certificates.crt
+# microbin will be in /usr/local/bin/microbin/
+WORKDIR /usr/local/bin
 
 # copy built exacutable
-COPY --from=build \
-  /app/target/release/microbin \
-  /usr/bin/microbin
+COPY --from=builder /usr/src/microbin/target/release/microbin /usr/local/bin/microbin
 
-# Expose webport used for the webserver to the docker runtime
-EXPOSE 8080
-
-ENTRYPOINT ["microbin"]
+# run the binary
+CMD ["microbin"]
